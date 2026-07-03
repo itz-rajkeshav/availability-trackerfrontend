@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import MentorqueBrand from "../components/MentorqueLogo";
 
 const ROLES = [
   { value: "USER", label: "User" },
@@ -37,12 +38,8 @@ export default function Register() {
       <div className="w-full max-w-md">
         <div className="bg-navy-900 border border-navy-700 rounded-xl p-8 shadow-xl">
           <div className="flex flex-col items-center mb-6">
-  <img
-    src="/mentorque-logo.png.jpeg"
-    alt="MentorQue"
-    className="h-14 mb-3 object-contain"
-  />
-  <h1 className="text-2xl font-semibold text-white mb-1">
+            <MentorqueBrand size="lg" className="mb-3" textClassName="font-bold text-white tracking-tight" />
+            <h1 className="text-2xl font-semibold text-white mb-1">
     Register
   </h1>
   <p className="text-slate-400 text-sm">

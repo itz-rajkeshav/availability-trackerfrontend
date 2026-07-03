@@ -21,8 +21,14 @@ body {
   }
 
   .mq-input {
-    @apply w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.1] text-sm px-3
+    @apply w-full h-10 rounded-lg bg-navy-800 border border-white/[0.1] text-sm px-3
       transition-colors focus:outline-none focus:ring-2 focus:ring-white/15 focus:border-white/20;
+    color: #fafafa;
+    color-scheme: dark;
+  }
+
+  .mq-input option {
+    background-color: #18181b;
     color: #fafafa;
   }
 
@@ -56,7 +62,7 @@ body {
   }
 
   .mq-slot {
-    @apply block w-full min-h-[1.75rem] rounded-md transition-colors;
+    @apply relative flex items-center justify-center w-full min-h-[1.75rem] rounded-md transition-colors;
   }
 
   .mq-slot-off {
@@ -64,8 +70,13 @@ body {
   }
 
   .mq-slot-on {
-    @apply bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30
+    @apply bg-white/[0.22] hover:bg-white/[0.28] border border-white/30
       shadow-[inset_0_1px_0_rgba(255,255,255,0.18)];
+  }
+
+  .mq-slot-check {
+    @apply flex h-3 w-3 shrink-0 items-center justify-center rounded-full
+      border border-white/35 bg-white/[0.14];
   }
 
   .mq-slot-past {

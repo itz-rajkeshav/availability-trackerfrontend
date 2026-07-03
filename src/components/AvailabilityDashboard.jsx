@@ -205,12 +205,11 @@ export default function AvailabilityDashboard({ role = "USER" }) {
     <div className="mx-auto w-full max-w-[1600px] space-y-5">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">Availability</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink-50">{heading}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-ink-50">{heading}</h1>
           <p className="mt-0.5 text-sm text-ink-500">Set when you&apos;re available for sessions.</p>
         </div>
         <div className="w-full sm:w-44 sm:shrink-0">
-          <label className="mq-label">Timezone</label>
+          <label className="mq-label text-right">Timezone</label>
           <select
             value={displayTimezone}
             onChange={(e) => setDisplayTimezone(e.target.value)}
@@ -308,7 +307,7 @@ export default function AvailabilityDashboard({ role = "USER" }) {
                             ${!colActionable
                               ? "cursor-not-allowed text-ink-600"
                               : "cursor-pointer hover:bg-white/[0.04]"}
-                            ${colActionable && colActive ? "text-emerald-400" : ""}
+                            ${colActionable && colActive ? "text-ink-50" : ""}
                             ${colActionable && !colActive ? "text-ink-50" : ""}
                           `}
                         >
@@ -336,7 +335,7 @@ export default function AvailabilityDashboard({ role = "USER" }) {
                           ${!rowActionable
                             ? "cursor-not-allowed text-ink-600"
                             : "cursor-pointer hover:bg-white/[0.04]"}
-                          ${rowActionable && rowActive ? "text-emerald-400" : ""}
+                          ${rowActionable && rowActive ? "text-ink-50" : ""}
                           ${rowActionable && !rowActive ? "text-ink-400" : ""}
                         `}
                       >
@@ -370,7 +369,23 @@ export default function AvailabilityDashboard({ role = "USER" }) {
                               ${!disabled && enabled ? "mq-slot-on" : ""}
                               ${!disabled && !enabled ? "mq-slot-off" : ""}
                             `}
-                          />
+                          >
+                            {!disabled && enabled && (
+                              <span className="mq-slot-check" aria-hidden>
+                                <svg
+                                  className="h-2 w-2 text-white/85"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M2.5 6l2.5 2.5 4.5-5" />
+                                </svg>
+                              </span>
+                            )}
+                          </button>
                         </td>
                       );
                     })}

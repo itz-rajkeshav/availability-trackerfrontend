@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import MentorqueBrand from "./MentorqueLogo";
 
 const SSO_WELCOME_MODAL_KEY = "sso_show_welcome_modal";
 
@@ -115,11 +116,8 @@ function UserMenu({ name, email, role, onLogout }) {
 
 function HeaderBrand() {
   return (
-    <Link to="/" className="flex shrink-0 items-center gap-2.5">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
-        <img src="/mentorque-logo.png" alt="Mentorque" className="h-full w-full object-contain" />
-      </div>
-      <span className="text-[15px] font-bold text-ink-50 tracking-tight">Mentorque</span>
+    <Link to="/" className="flex shrink-0 items-center">
+      <MentorqueBrand />
     </Link>
   );
 }
@@ -128,7 +126,19 @@ function AvailabilityLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink-400">
       <span className="inline-flex items-center gap-2">
-        <span className="h-2.5 w-5 shrink-0 rounded-md bg-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]" aria-hidden />
+        <span className="mq-slot-check h-2.5 w-2.5" aria-hidden>
+          <svg
+            className="h-1.5 w-1.5 text-white/85"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2.5 6l2.5 2.5 4.5-5" />
+          </svg>
+        </span>
         Available
       </span>
       <span className="inline-flex items-center gap-2">
@@ -227,7 +237,7 @@ export default function Layout() {
               Logged in as
             </p>
             <p className="text-ink-50 text-xl sm:text-2xl mb-3 break-all">{welcomeModal.email}</p>
-            <p className="text-emerald-400 text-xl sm:text-2xl font-semibold">{welcomeModal.role}</p>
+            <p className="text-ink-50 text-xl sm:text-2xl font-semibold">{welcomeModal.role}</p>
             <p className="text-ink-600 text-xs mt-6">Click anywhere to continue</p>
           </div>
         </div>
@@ -286,13 +296,12 @@ export default function Layout() {
       </main>
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-navy-900/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-11 w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-11 w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           {showAvailabilityLegend ? (
             <AvailabilityLegend />
           ) : (
             <span className="text-xs text-ink-600">Mentorque Availability</span>
           )}
-          <span className="shrink-0 text-[11px] text-ink-600">© {new Date().getFullYear()} Mentorque</span>
         </div>
       </footer>
     </div>
