@@ -50,7 +50,7 @@ export function formatTo12Hour(timeStr) {
   hours = hours % 12;
   if (hours === 0) hours = 12;
 
-  return `${hours}:${minuteStr} ${period}`;
+  return `${String(hours).padStart(2, "0")}:${minuteStr.padStart(2, "0")} ${period}`;
 }
 
 export function formatTimeRange(rangeStr) {
@@ -126,6 +126,15 @@ export function getWeekDates(weekStartStr) {
     dates.push(d.toISOString().slice(0, 10));
   }
   return dates;
+}
+
+/** Mon–Sun dates for the calendar week containing today, shifted by weekOffset weeks. */
+export function getViewWeekDates(weekOffset = 0) {
+  const today = new Date();
+  const base = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const monday = new Date(getWeekStartStr(base) + "T00:00:00Z");
+  monday.setUTCDate(monday.getUTCDate() + weekOffset * 7);
+  return getWeekDates(monday.toISOString().slice(0, 10));
 }
 
 /** Convert UTC (date, hour) to IST (date, hour) for display */
