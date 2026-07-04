@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import * as availabilityApi from "../api/availability";
 import {
-  getWeekStartStr,
+  getViewWeekDates,
   formatDateLocal,
   formatTimeLocal,
   formatTimeRange,
@@ -21,7 +21,7 @@ const TIMEZONE_OPTIONS = [
 export default function Availability() {
   const { user } = useAuth();
   const [displayTimezone, setDisplayTimezone] = useState(user?.timezone || "UTC");
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = today..today+6, 1 = +7..+13, etc.
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current Mon–Sun week
   const [data, setData] = useState({ dates: [], availability: {} });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,13 +35,8 @@ export default function Availability() {
     setLoading(true);
     setError("");
     try {
-      // Compute the anchor date for this view: today + weekOffset * 7 (UTC date)
-      const today = new Date();
-      const base = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-      base.setUTCDate(base.getUTCDate() + weekOffset * 7);
-      const weekStartStr = getWeekStartStr(base);
-
-      const res = await availabilityApi.getWeekly({ weekStart: weekStartStr });
+      const weekDates = getViewWeekDates(weekOffset);
+      const res = await availabilityApi.getWeekly({ weekStart: weekDates[0] });
       setData(res);
       setToggles({});
     } catch (e) {
@@ -114,21 +109,7 @@ export default function Availability() {
 
   const hasChanges = Object.keys(toggles).length > 0;
 
-  // Visible 7-day window: always today + weekOffset * 7, forward only
-  const buildGridDates = () => {
-    const today = new Date();
-    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-    start.setUTCDate(start.getUTCDate() + weekOffset * 7);
-    const days = [];
-    for (let i = 0; i < 7; i += 1) {
-      const d = new Date(start);
-      d.setUTCDate(start.getUTCDate() + i);
-      days.push(d.toISOString().slice(0, 10));
-    }
-    return days;
-  };
-
-  const gridDates = buildGridDates();
+  const gridDates = getViewWeekDates(weekOffset);
   const gridStart = gridDates[0];
 
   const prevWeek = () => {
@@ -302,12 +283,18 @@ export default function Availability() {
           {loading ? (
             <div className="p-12 text-center text-slate-400 font-medium">Loading...</div>
           ) : (
-            <table className="w-full min-w-[800px] border-collapse">
+            <table className="w-full table-fixed border-collapse">
+              <colgroup>
+                <col style={{ width: "11rem" }} />
+                {gridDates.map((d) => (
+                  <col key={d} />
+                ))}
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-800">
-                  <th className="text-left py-4 px-3 text-slate-400 font-medium text-sm w-28">Time</th>
+                  <th className="text-left py-2 px-2 text-slate-400 font-medium text-xs whitespace-nowrap">Time</th>
                   {gridDates.map((d) => (
-                    <th key={d} className="py-4 px-3 text-white font-medium text-sm">
+                    <th key={d} className="py-2 px-1 text-white font-medium text-xs text-center">
                       {formatDateLocal(d, displayTimezone)}
                     </th>
                   ))}
@@ -316,20 +303,20 @@ export default function Availability() {
               <tbody>
                 {HOURS.map((hour) => (
                   <tr key={hour} className="border-b border-slate-800/80">
-                    <td className="py-2 px-3 text-slate-400 font-medium text-xs">
+                    <td className="py-1.5 px-2 text-slate-400 font-medium text-xs whitespace-nowrap align-middle">
                       {formatTimeOptionLabel(hour)}
                     </td>
                     {gridDates.map((dateStr) => {
                       const enabled = isSlotEnabled(dateStr, hour);
                       const disabled = isSlotDisabled(dateStr, hour);
                       return (
-                        <td key={dateStr} className="p-2">
+                        <td key={dateStr} className="p-1 align-middle">
                           <button
                             type="button"
                             onClick={() => toggleSlot(dateStr, hour)}
                             disabled={disabled}
                             className={`
-                              w-full py-2 rounded-lg border font-medium text-xs uppercase tracking-wide transition
+                              block w-full py-2 rounded-md border font-medium text-xs uppercase tracking-wide transition
                               ${disabled
                                 ? "bg-slate-800/50 border-slate-800 cursor-not-allowed opacity-40 text-slate-500"
                                 : ""}

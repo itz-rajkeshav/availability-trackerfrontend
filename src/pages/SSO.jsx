@@ -1,6 +1,14 @@
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
+function decodeJwtPayload(token) {
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch {
+    return null;
+  }
+}
+
 export default function SSO() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -8,25 +16,33 @@ export default function SSO() {
   const userId = searchParams.get("userId");
   const email = searchParams.get("email");
 
-  const { resolvedRole, displayEmail } = useMemo(() => {
+  const { resolvedRole, displayEmail, tokenPayload } = useMemo(() => {
     let role = roleParam;
-    if (!role && token) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        role = payload.role || (payload.isAdmin ? "ADMIN" : "MENTOR");
-      } catch {
-        role = roleParam;
-      }
+    const payload = token ? decodeJwtPayload(token) : null;
+    if (!role && payload) {
+      role = payload.role || (payload.isAdmin ? "ADMIN" : "MENTOR");
     }
     if (!role || role === "undefined") role = "USER";
     return {
       resolvedRole: role,
       displayEmail: email || (userId ? `${userId}@sso` : "—"),
+      tokenPayload: payload,
     };
   }, [token, roleParam, email, userId]);
 
   useEffect(() => {
-    console.log("[SSO] Starting SSO handler");
+    console.log("[SSO] tracker /sso received", {
+      userId,
+      email: email || null,
+      role: resolvedRole,
+      nameFromJwt:
+        tokenPayload?.name ||
+        tokenPayload?.fullName ||
+        tokenPayload?.displayName ||
+        null,
+      jwtPayload: tokenPayload,
+      token,
+    });
     if (!token) {
       window.location.href = "/welcome";
       return;
@@ -93,7 +109,7 @@ export default function SSO() {
     return () => {
       cancelled = true;
     };
-  }, [token, resolvedRole, userId, email, displayEmail]);
+  }, [token, resolvedRole, userId, email, displayEmail, tokenPayload]);
 
   if (!token) {
     return null;

@@ -7,6 +7,7 @@ import UserAvailability from "./pages/UserAvailability";
 import MentorAvailability from "./pages/MentorAvailability";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettings from "./pages/AdminSettings";
+import AdminSchedules from "./pages/AdminSchedules";
 
 const WELCOME_PATH = "/welcome";
 
@@ -98,6 +99,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/schedules"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <AdminSchedules />
             </ProtectedRoute>
           }
         />

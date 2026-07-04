@@ -79,7 +79,7 @@ export default function AdminSettings() {
             type="button"
             onClick={handleConnectGoogle}
             disabled={loading}
-            className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-navy-950 font-medium disabled:opacity-50"
           >
             Connect Google Calendar
           </button>

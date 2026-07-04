@@ -5,6 +5,6 @@ export async function getWeekly(params = {}) {
   return get(`/api/availability/weekly${q ? `?${q}` : ""}`);
 }
 
-export async function saveBatch(slots) {
-  return post("/api/availability/batch", { slots });
+export async function saveBatch(body) {
+  return post("/api/availability/batch", body);
 }
