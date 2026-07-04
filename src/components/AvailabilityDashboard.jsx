@@ -7,8 +7,7 @@ import {
   formatTimeLocal,
   formatTimeRange,
   slotToUTC,
-  isPastDate,
-  isPastDateTime,
+  isSlotInPast,
 } from "../utils/time";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -23,16 +22,70 @@ const ROLE_HEADINGS = {
   MENTOR: "Mentor Dashboard",
 };
 
+function SaveScopeModal({ open, saving, onClose, onChoose }) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/80 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-xl border border-white/[0.1] bg-navy-900 p-5 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="save-scope-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id="save-scope-title" className="text-base font-semibold text-ink-50">
+          Apply changes
+        </h3>
+        <p className="mt-2 text-sm text-ink-500">
+          Like a recurring alarm: change just this week, or update your usual weekly schedule.
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onChoose("week")}
+            className="mq-btn-primary w-full"
+          >
+            {saving ? "Saving…" : "Just this week"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onChoose("template")}
+            className="mq-btn-secondary w-full"
+          >
+            Every week
+          </button>
+          <button type="button" disabled={saving} onClick={onClose} className="mq-btn-secondary w-full">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AvailabilityDashboard({ role = "USER" }) {
   const { user } = useAuth();
   const [displayTimezone, setDisplayTimezone] = useState(user?.timezone || "UTC");
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current Mon–Sun week
-  const [data, setData] = useState({ dates: [], availability: {} });
-  const [loading, setLoading] = useState(!user); // only show loading if no user yet
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [data, setData] = useState({ dates: [], availability: {}, hasTemplate: false });
+  const [loading, setLoading] = useState(!user);
   const [saving, setSaving] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [toggles, setToggles] = useState({});
   const [error, setError] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const dragRef = useRef({ active: false, paintValue: false, visited: new Set() });
+
+  useEffect(() => {
+    const tick = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(tick);
+  }, []);
 
   useEffect(() => {
     const endDrag = () => {
@@ -51,7 +104,6 @@ export default function AvailabilityDashboard({ role = "USER" }) {
       const weekDates = getViewWeekDates(weekOffset);
       const res = await availabilityApi.getWeekly({ weekStart: weekDates[0] });
       setData(res);
-      // DO NOT call setToggles({}) here
     } catch (e) {
       setError(e.message || "Failed to load availability");
     } finally {
@@ -75,15 +127,7 @@ export default function AvailabilityDashboard({ role = "USER" }) {
     return slots.some((s) => s.startTime.slice(0, 13) === startTime.slice(0, 13));
   };
 
-  const isSlotDisabled = (dateStr, hour) => {
-    if (isPastDate(dateStr)) return true;
-    const utcTodayStr = new Date().toISOString().slice(0, 10);
-    if (dateStr === utcTodayStr) {
-      const { startTime } = slotToUTC(dateStr, hour);
-      return isPastDateTime(startTime);
-    }
-    return false;
-  };
+  const isSlotDisabled = (dateStr, hour) => isSlotInPast(dateStr, hour, nowMs);
 
   const gridDates = getViewWeekDates(weekOffset);
   const gridStart = gridDates[0];
@@ -144,32 +188,41 @@ export default function AvailabilityDashboard({ role = "USER" }) {
   const hasActionableColumn = (dateStr) => HOURS.some((h) => !isSlotDisabled(dateStr, h));
   const hasActionableRow = (hour) => gridDates.some((d) => !isSlotDisabled(d, hour));
 
-  const saveBatch = async () => {
-    setSaving(true);
-    setError("");
-    const slots = [];
-    gridDates.forEach((dateStr) => {
+  const buildWeekChanges = () =>
+    Object.entries(toggles).map(([key, enabled]) => {
+      const sep = key.lastIndexOf("-");
+      const dateStr = key.slice(0, sep);
+      const hour = Number(key.slice(sep + 1));
+      const dayOfWeek = gridDates.indexOf(dateStr);
+      return { dayOfWeek, hour, enabled };
+    });
+
+  const buildFullPattern = () => {
+    const pattern = [];
+    gridDates.forEach((dateStr, dayOfWeek) => {
       HOURS.forEach((hour) => {
-        const key = `${dateStr}-${hour}`;
-        if (toggles[key] === undefined) return;
-        const enabled = toggles[key];
-        const { startTime, endTime } = slotToUTC(dateStr, hour);
-        slots.push({
-          date: dateStr,
-          startTime,
-          endTime,
-          enabled,
-        });
+        if (isSlotDisabled(dateStr, hour)) return;
+        if (isSlotEnabled(dateStr, hour)) {
+          pattern.push({ dayOfWeek, hour });
+        }
       });
     });
-    if (slots.length === 0) {
-      setSaving(false);
-      return;
-    }
+    return pattern;
+  };
+
+  const commitSave = async (scope) => {
+    setSaving(true);
+    setError("");
     try {
-      await availabilityApi.saveBatch(slots);
-      await fetchWeekly();
+      const body =
+        scope === "template"
+          ? { weekStart: gridStart, scope: "template", pattern: buildFullPattern() }
+          : { weekStart: gridStart, scope: "week", slots: buildWeekChanges() };
+
+      const res = await availabilityApi.saveBatch(body);
+      setData(res);
       setToggles({});
+      setSaveModalOpen(false);
     } catch (e) {
       setError(e.message || "Failed to save");
     } finally {
@@ -177,19 +230,23 @@ export default function AvailabilityDashboard({ role = "USER" }) {
     }
   };
 
+  const handleSaveClick = () => {
+    if (!data.hasTemplate) {
+      commitSave("template");
+      return;
+    }
+    setSaveModalOpen(true);
+  };
+
   const hasChanges = Object.keys(toggles).length > 0;
 
   const prevWeek = () => {
-    if (weekOffset === 0) return; // do not navigate into the past
+    if (weekOffset === 0) return;
     setWeekOffset((prev) => Math.max(0, prev - 1));
   };
-  const nextWeek = () => {
-    setWeekOffset((prev) => prev + 1);
-  };
+  const nextWeek = () => setWeekOffset((prev) => prev + 1);
 
-  const cancelChanges = () => {
-    setToggles({});
-  };
+  const cancelChanges = () => setToggles({});
 
   const formatTimeOptionLabel = (utcHourIndex) => {
     const startISO = new Date(Date.UTC(2000, 0, 1, utcHourIndex, 0)).toISOString();
@@ -203,10 +260,19 @@ export default function AvailabilityDashboard({ role = "USER" }) {
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5">
+      <SaveScopeModal
+        open={saveModalOpen}
+        saving={saving}
+        onClose={() => !saving && setSaveModalOpen(false)}
+        onChoose={commitSave}
+      />
+
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-ink-50">{heading}</h1>
-          <p className="mt-0.5 text-sm text-ink-500">Set when you&apos;re available for sessions.</p>
+          <p className="mt-0.5 text-sm text-ink-500">
+            Your usual weekly schedule applies every week. Change a slot to adjust this week or all weeks.
+          </p>
         </div>
         <div className="w-full sm:w-44 sm:shrink-0">
           <label className="mq-label text-right">Timezone</label>
@@ -267,7 +333,7 @@ export default function AvailabilityDashboard({ role = "USER" }) {
             </button>
             <button
               type="button"
-              onClick={saveBatch}
+              onClick={handleSaveClick}
               disabled={saving || !hasChanges}
               className="mq-btn-primary"
             >
@@ -323,73 +389,73 @@ export default function AvailabilityDashboard({ role = "USER" }) {
                   const rowActive = isRowAllEnabled(hour);
                   const rowActionable = hasActionableRow(hour);
                   return (
-                  <tr key={hour}>
-                    <td className="px-1 py-1 align-middle">
-                      <button
-                        type="button"
-                        onClick={() => toggleRow(hour)}
-                        disabled={!rowActionable}
-                        title={rowActionable ? "Toggle all slots this hour" : undefined}
-                        className={`
-                          w-full rounded-md px-2 py-1.5 text-left text-xs font-medium whitespace-nowrap transition
-                          ${!rowActionable
-                            ? "cursor-not-allowed text-ink-600"
-                            : "cursor-pointer hover:bg-white/[0.04]"}
-                          ${rowActionable && rowActive ? "text-ink-50" : ""}
-                          ${rowActionable && !rowActive ? "text-ink-400" : ""}
-                        `}
-                      >
-                        {formatTimeOptionLabel(hour)}
-                      </button>
-                    </td>
-                    {gridDates.map((dateStr) => {
-                      const enabled = isSlotEnabled(dateStr, hour);
-                      const disabled = isSlotDisabled(dateStr, hour);
-                      return (
-                        <td key={dateStr} className="p-0.5 align-middle">
-                          <button
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              startDrag(dateStr, hour);
-                            }}
-                            onMouseEnter={() => continueDrag(dateStr, hour)}
-                            disabled={disabled}
-                            aria-label={
-                              disabled
-                                ? "Past slot"
-                                : enabled
-                                  ? "Available, click to remove"
-                                  : "Unavailable, click to mark available"
-                            }
-                            className={`
-                              mq-slot
-                              ${!disabled ? "cursor-pointer" : ""}
-                              ${disabled ? "mq-slot-past cursor-not-allowed" : ""}
-                              ${!disabled && enabled ? "mq-slot-on" : ""}
-                              ${!disabled && !enabled ? "mq-slot-off" : ""}
-                            `}
-                          >
-                            {!disabled && enabled && (
-                              <span className="mq-slot-check" aria-hidden>
-                                <svg
-                                  className="h-2 w-2 text-white/85"
-                                  viewBox="0 0 12 12"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <path d="M2.5 6l2.5 2.5 4.5-5" />
-                                </svg>
-                              </span>
-                            )}
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                    <tr key={hour}>
+                      <td className="px-1 py-1 align-middle">
+                        <button
+                          type="button"
+                          onClick={() => toggleRow(hour)}
+                          disabled={!rowActionable}
+                          title={rowActionable ? "Toggle all slots this hour" : undefined}
+                          className={`
+                            w-full rounded-md px-2 py-1.5 text-left text-xs font-medium whitespace-nowrap transition
+                            ${!rowActionable
+                              ? "cursor-not-allowed text-ink-600"
+                              : "cursor-pointer hover:bg-white/[0.04]"}
+                            ${rowActionable && rowActive ? "text-ink-50" : ""}
+                            ${rowActionable && !rowActive ? "text-ink-400" : ""}
+                          `}
+                        >
+                          {formatTimeOptionLabel(hour)}
+                        </button>
+                      </td>
+                      {gridDates.map((dateStr) => {
+                        const enabled = isSlotEnabled(dateStr, hour);
+                        const disabled = isSlotDisabled(dateStr, hour);
+                        return (
+                          <td key={dateStr} className="p-0.5 align-middle">
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                startDrag(dateStr, hour);
+                              }}
+                              onMouseEnter={() => continueDrag(dateStr, hour)}
+                              disabled={disabled}
+                              aria-label={
+                                disabled
+                                  ? "Past slot"
+                                  : enabled
+                                    ? "Available, click to remove"
+                                    : "Unavailable, click to mark available"
+                              }
+                              className={`
+                                mq-slot
+                                ${!disabled ? "cursor-pointer" : ""}
+                                ${disabled ? "mq-slot-past cursor-not-allowed" : ""}
+                                ${!disabled && enabled ? "mq-slot-on" : ""}
+                                ${!disabled && !enabled ? "mq-slot-off" : ""}
+                              `}
+                            >
+                              {!disabled && enabled && (
+                                <span className="mq-slot-check" aria-hidden>
+                                  <svg
+                                    className="h-2 w-2 text-white/85"
+                                    viewBox="0 0 12 12"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M2.5 6l2.5 2.5 4.5-5" />
+                                  </svg>
+                                </span>
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
                   );
                 })}
               </tbody>

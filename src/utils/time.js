@@ -82,9 +82,13 @@ export function isPastDate(dateStr) {
   return dateStr < utcTodayStr;
 }
 
-/** Check if datetime (UTC ISO string) is in the past */
-export function isPastDateTime(isoString) {
-  return new Date(isoString).getTime() <= Date.now();
+export function isPastDateTime(isoString, nowMs = Date.now()) {
+  return new Date(isoString).getTime() <= nowMs;
+}
+
+/** True when this grid cell's start time has passed (any day, not only UTC today). */
+export function isSlotInPast(dateStr, hour, nowMs = Date.now()) {
+  return isPastDateTime(slotToUTC(dateStr, hour).startTime, nowMs);
 }
 
 /** Get start of week (Monday) for a date, in UTC date string YYYY-MM-DD */
