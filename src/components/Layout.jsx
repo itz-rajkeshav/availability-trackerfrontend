@@ -48,6 +48,18 @@ function IconCalendar({ className }) {
   );
 }
 
+function IconUsers({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+      />
+    </svg>
+  );
+}
+
 function IconLayoutGrid({ className }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -200,7 +212,9 @@ export default function Layout() {
   const schedulePath = user?.role === "MENTOR" ? "/mentor" : "/availability";
   const scheduleLabel = user?.role === "MENTOR" ? "Mentor Schedule" : "Your Schedule";
   const showAvailabilityLegend =
-    location.pathname === "/availability" || location.pathname === "/mentor";
+    location.pathname === "/availability" ||
+    location.pathname === "/mentor" ||
+    location.pathname === "/admin/schedules";
 
   return (
     <div className="min-h-screen bg-navy-950 flex flex-col">
@@ -269,6 +283,10 @@ export default function Layout() {
                     <IconCalendar className="h-4 w-4 shrink-0" />
                     <span className="hidden md:inline">{scheduleLabel}</span>
                   </NavLink>
+                  <NavLink to="/admin/schedules" className={navLinkClass}>
+                    <IconUsers className="h-4 w-4 shrink-0" />
+                    <span className="hidden md:inline">Team Schedules</span>
+                  </NavLink>
                 </>
               ) : (
                 <>
@@ -277,10 +295,16 @@ export default function Layout() {
                     <span>{scheduleLabel}</span>
                   </NavLink>
                   {user?.role === "ADMIN" && (
-                    <NavLink to="/admin" className={navLinkClass}>
-                      <IconLayoutGrid className="h-4 w-4 shrink-0" />
-                      <span className="hidden sm:inline">Admin</span>
-                    </NavLink>
+                    <>
+                      <NavLink to="/admin/schedules" className={navLinkClass}>
+                        <IconUsers className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Team Schedules</span>
+                      </NavLink>
+                      <NavLink to="/admin" className={navLinkClass}>
+                        <IconLayoutGrid className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Admin</span>
+                      </NavLink>
+                    </>
                   )}
                 </>
               )}
