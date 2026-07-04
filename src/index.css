@@ -27,7 +27,8 @@ body {
     color-scheme: dark;
   }
 
-  .mq-input option {
+  .mq-input option,
+  .mq-input optgroup {
     background-color: #18181b;
     color: #fafafa;
   }
