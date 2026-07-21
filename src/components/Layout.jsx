@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import MentorqueBrand from "./MentorqueLogo";
-
-const SSO_WELCOME_MODAL_KEY = "sso_show_welcome_modal";
+import { ROLE, ROLE_LOGIN_PATH, ROLE_LABEL } from "../constants/roles.js";
 
 function capitalize(word) {
   if (!word) return "";
@@ -83,6 +82,21 @@ function IconLogOut({ className }) {
     </svg>
   );
 }
+
+// nav items per role, kept as data instead of a pile of conditional JSX
+const NAV = {
+  [ROLE.USER]: [{ to: "/dashboard", label: "Your schedule", icon: IconCalendar, end: true }],
+  [ROLE.MENTOR]: [{ to: "/mentor", label: "Your schedule", icon: IconCalendar, end: true }],
+  [ROLE.ADMIN]: [
+    { to: "/admin", label: "Requests", icon: IconLayoutGrid, end: true },
+    { to: "/admin/mentors", label: "Mentors", icon: IconUsers },
+    { to: "/admin/mentees", label: "Mentees", icon: IconUsers },
+    { to: "/admin/meetings", label: "Calls", icon: IconCalendar },
+  ],
+};
+
+/** Routes where the availability colour legend is meaningful. */
+const LEGEND_ROUTES = ["/dashboard", "/mentor", "/admin/mentors", "/admin/mentees"];
 
 function navLinkClass({ isActive }) {
   return `inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
@@ -172,10 +186,8 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith("/admin");
   const email = user?.email ?? "";
 
-  const [welcomeModal, setWelcomeModal] = useState(null);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -189,74 +201,17 @@ export default function Layout() {
     setScrolled(window.scrollY > 12);
   }, [location.pathname]);
 
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(SSO_WELCOME_MODAL_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      sessionStorage.removeItem(SSO_WELCOME_MODAL_KEY);
-      setWelcomeModal({
-        email: data.email || "—",
-        role: data.role || "—",
-      });
-      const t = setTimeout(() => setWelcomeModal(null), 2500);
-      return () => clearTimeout(t);
-    } catch (_) {}
-  }, []);
-
   const handleLogout = () => {
+    const path = ROLE_LOGIN_PATH[user?.role] ?? ROLE_LOGIN_PATH[ROLE.USER];
     logout();
-    navigate("/welcome");
+    navigate(path, { replace: true });
   };
 
-  const schedulePath = user?.role === "MENTOR" ? "/mentor" : "/availability";
-  const scheduleLabel = user?.role === "MENTOR" ? "Mentor Schedule" : "Your Schedule";
-  const showAvailabilityLegend =
-    location.pathname === "/availability" ||
-    location.pathname === "/mentor" ||
-    location.pathname === "/admin/schedules";
+  const navItems = NAV[user?.role] ?? [];
+  const showAvailabilityLegend = LEGEND_ROUTES.includes(location.pathname);
 
   return (
     <div className="min-h-screen bg-navy-950 flex flex-col">
-      {welcomeModal && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-navy-950/80 backdrop-blur-sm p-4 cursor-pointer"
-          onClick={() => setWelcomeModal(null)}
-        >
-          <div
-            className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.1] rounded-2xl shadow-2xl p-10 max-w-lg w-full text-center"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="welcome-modal-title"
-          >
-            <div className="flex justify-center mb-4">
-              <span
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/20 text-green-400"
-                aria-hidden
-              >
-                <svg
-                  className="h-9 w-9"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              </span>
-            </div>
-            <p id="welcome-modal-title" className="text-ink-400 text-lg mb-6">
-              Logged in as
-            </p>
-            <p className="text-ink-50 text-xl sm:text-2xl mb-3 break-all">{welcomeModal.email}</p>
-            <p className="text-ink-50 text-xl sm:text-2xl font-semibold">{welcomeModal.role}</p>
-            <p className="text-ink-600 text-xs mt-6">Click anywhere to continue</p>
-          </div>
-        </div>
-      )}
-
       <header
         className={`sticky top-0 z-50 isolate transition-[background-color,box-shadow,border-color] duration-300 ease-out ${
           scrolled
@@ -269,49 +224,21 @@ export default function Layout() {
             <HeaderBrand />
 
             <nav className="flex items-center gap-1">
-              {isAdminRoute && user?.role === "ADMIN" ? (
-                <>
-                  <NavLink to="/admin" end className={navLinkClass}>
-                    <IconLayoutGrid className="h-4 w-4 shrink-0" />
-                    <span className="hidden md:inline">Dashboard</span>
-                  </NavLink>
-                  <NavLink to="/admin/settings" className={navLinkClass}>
-                    <span className="hidden md:inline">Settings</span>
-                    <span className="md:hidden">Settings</span>
-                  </NavLink>
-                  <NavLink to={schedulePath} className={navLinkClass}>
-                    <IconCalendar className="h-4 w-4 shrink-0" />
-                    <span className="hidden md:inline">{scheduleLabel}</span>
-                  </NavLink>
-                  <NavLink to="/admin/schedules" className={navLinkClass}>
-                    <IconUsers className="h-4 w-4 shrink-0" />
-                    <span className="hidden md:inline">Team Schedules</span>
-                  </NavLink>
-                </>
-              ) : (
-                <>
-                  <NavLink to={schedulePath} className={navLinkClass}>
-                    <IconCalendar className="h-4 w-4 shrink-0" />
-                    <span>{scheduleLabel}</span>
-                  </NavLink>
-                  {user?.role === "ADMIN" && (
-                    <>
-                      <NavLink to="/admin/schedules" className={navLinkClass}>
-                        <IconUsers className="h-4 w-4 shrink-0" />
-                        <span className="hidden sm:inline">Team Schedules</span>
-                      </NavLink>
-                      <NavLink to="/admin" className={navLinkClass}>
-                        <IconLayoutGrid className="h-4 w-4 shrink-0" />
-                        <span className="hidden sm:inline">Admin</span>
-                      </NavLink>
-                    </>
-                  )}
-                </>
-              )}
+              {navItems.map(({ to, label, icon: Icon, end }) => (
+                <NavLink key={to} to={to} end={end} className={navLinkClass}>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">{label}</span>
+                </NavLink>
+              ))}
             </nav>
           </div>
 
-          <UserMenu name={user?.name} email={email} role={user?.role} onLogout={handleLogout} />
+          <UserMenu
+            name={user?.name}
+            email={email}
+            role={ROLE_LABEL[user?.role] ?? user?.role}
+            onLogout={handleLogout}
+          />
         </div>
       </header>
 

@@ -1,74 +1,74 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
-import SSO from "./pages/SSO";
-import Welcome from "./pages/Welcome";
-import UserAvailability from "./pages/UserAvailability";
-import MentorAvailability from "./pages/MentorAvailability";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminSettings from "./pages/AdminSettings";
-import AdminSchedules from "./pages/AdminSchedules";
+import { ROLE, ROLE_LOGIN_PATH, homePathFor } from "./constants/roles.js";
 
-const WELCOME_PATH = "/welcome";
+import UserLogin from "./pages/login/UserLogin";
+import MentorLogin from "./pages/login/MentorLogin";
+import AdminLogin from "./pages/login/AdminLogin";
 
+import UserDashboard from "./pages/UserDashboard";
+import MentorDashboard from "./pages/MentorDashboard";
+import AdminRequests from "./pages/admin/AdminRequests";
+import AdminRequestDetail from "./pages/admin/AdminRequestDetail";
+import AdminMentors from "./pages/admin/AdminMentors";
+import AdminPeople from "./pages/admin/AdminPeople";
+import AdminMeetings from "./pages/admin/AdminMeetings";
+
+function FullScreenMessage({ children }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-sm text-ink-500">{children}</div>
+    </div>
+  );
+}
+
+// route guard, but just for UX - the API enforces roles independently so messing
+// with localStorage doesn't actually get you anywhere
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const welcomeTo = location.search ? `${WELCOME_PATH}${location.search}` : WELCOME_PATH;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-navy-950">
-        <div className="text-slate-400">Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return <FullScreenMessage>Loading…</FullScreenMessage>;
 
   if (!user) {
-    return <Navigate to={welcomeTo} replace />;
+    // send to whichever login page matches the area they were trying to reach
+    const target = location.pathname.startsWith("/admin")
+      ? ROLE_LOGIN_PATH[ROLE.ADMIN]
+      : location.pathname.startsWith("/mentor")
+        ? ROLE_LOGIN_PATH[ROLE.MENTOR]
+        : ROLE_LOGIN_PATH[ROLE.USER];
+    return <Navigate to={target} replace />;
   }
 
-  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+  if (allowedRoles?.length && !allowedRoles.includes(user.role)) {
+    return <Navigate to={homePathFor(user.role)} replace />;
   }
 
   return children;
 }
 
-function DefaultRedirect() {
+function RootRedirect() {
   const { user, loading } = useAuth();
-  const location = useLocation();
-  const welcomeTo = location.search ? `${WELCOME_PATH}${location.search}` : WELCOME_PATH;
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-navy-950">
-        <div className="text-slate-400">Loading...</div>
-      </div>
-    );
-  }
-  if (!user) return <Navigate to={welcomeTo} replace />;
-  if (user.role === "MENTOR") return <Navigate to="/mentor" replace />;
-  if (user.role === "ADMIN") return <Navigate to="/admin" replace />;
-  return <Navigate to="/availability" replace />;
+  if (loading) return <FullScreenMessage>Loading…</FullScreenMessage>;
+  return <Navigate to={user ? homePathFor(user.role) : ROLE_LOGIN_PATH[ROLE.USER]} replace />;
 }
 
-function NormalizePathname({ children }) {
-  const location = useLocation();
-  const pathname = location.pathname;
-  if (pathname.startsWith("//")) {
-    const fixed = pathname.replace(/\/+/g, "/") + location.search;
-    return <Navigate to={fixed} replace />;
-  }
+/** Already signed in? Skip the login page. */
+function PublicOnly({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <FullScreenMessage>Loading…</FullScreenMessage>;
+  if (user) return <Navigate to={homePathFor(user.role)} replace />;
   return children;
 }
 
 export default function App() {
   return (
-    <NormalizePathname>
-      <Routes>
-        <Route path={WELCOME_PATH} element={<Welcome />} />
-        <Route path="/sso" element={<SSO />} />
-        <Route path="/sso/sso" element={<SSO />} />
+    <Routes>
+      <Route path="/login/user" element={<PublicOnly><UserLogin /></PublicOnly>} />
+      <Route path="/login/mentor" element={<PublicOnly><MentorLogin /></PublicOnly>} />
+      <Route path="/login/admin" element={<PublicOnly><AdminLogin /></PublicOnly>} />
+
       <Route
         path="/"
         element={
@@ -77,50 +77,68 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<DefaultRedirect />} />
+        <Route index element={<RootRedirect />} />
+
         <Route
-          path="availability"
+          path="dashboard"
           element={
-            <ProtectedRoute allowedRoles={["USER", "ADMIN"]}>
-              <UserAvailability />
+            <ProtectedRoute allowedRoles={[ROLE.USER]}>
+              <UserDashboard />
             </ProtectedRoute>
           }
         />
         <Route
           path="mentor"
           element={
-            <ProtectedRoute allowedRoles={["MENTOR"]}>
-              <MentorAvailability />
+            <ProtectedRoute allowedRoles={[ROLE.MENTOR]}>
+              <MentorDashboard />
             </ProtectedRoute>
           }
         />
+
         <Route
           path="admin"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
-              <AdminDashboard />
+            <ProtectedRoute allowedRoles={[ROLE.ADMIN]}>
+              <AdminRequests />
             </ProtectedRoute>
           }
         />
         <Route
-          path="admin/schedules"
+          path="admin/requests/:requestId"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
-              <AdminSchedules />
+            <ProtectedRoute allowedRoles={[ROLE.ADMIN]}>
+              <AdminRequestDetail />
             </ProtectedRoute>
           }
         />
         <Route
-          path="admin/settings"
+          path="admin/mentors"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
-              <AdminSettings />
+            <ProtectedRoute allowedRoles={[ROLE.ADMIN]}>
+              <AdminMentors />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/mentees"
+          element={
+            <ProtectedRoute allowedRoles={[ROLE.ADMIN]}>
+              <AdminPeople />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/meetings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLE.ADMIN]}>
+              <AdminMeetings />
             </ProtectedRoute>
           }
         />
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    </NormalizePathname>
   );
 }

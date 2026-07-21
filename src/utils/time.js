@@ -1,15 +1,15 @@
-/**
- * Frontend time handling: display in user's timezone (UTC or IST), send UTC to API.
- */
+// time helpers for the frontend - we display in the user's timezone (UTC or IST)
+// but everything sent to the API is UTC
 
 import { DateTime } from "luxon";
 
 function resolveIanaZone(timezone) {
-  // Never hardcode offsets; always use IANA zones so DST is handled automatically.
+  // use real IANA zones, not fixed offsets, so DST just works
   if (timezone === "IST") return "Asia/Kolkata";
-  // In this app, the "UTC/GMT" option is used for Ireland/UK-style time.
-  // Use Europe/Dublin so Ireland DST (IST / Irish Summer Time) is handled.
-  if (timezone === "UTC") return "Europe/Dublin";
+  // don't map "UTC" to Europe/Dublin here even though it's UTC+0 most of the year -
+  // Dublin observes Irish Summer Time so in summer it's actually UTC+1, which threw
+  // every slot off by an hour on the grid. keep this one as true UTC.
+  if (timezone === "UTC") return "UTC";
   return timezone || "UTC";
 }
 
@@ -71,12 +71,8 @@ export function formatSlotLabel(startISO, endISO, timezone) {
   return formatTimeRange(`${start} – ${end}`);
 }
 
-/**
- * Check if date (YYYY-MM-DD) is in the past.
- * Both dateStr and "today" are compared as UTC calendar dates so timezone
- * offset cannot make tomorrow appear as past (e.g. 11:30 PM IST March 15
- * is still March 15 UTC; March 16 UTC is never past).
- */
+// checks if a date (YYYY-MM-DD) is in the past. comparing both sides as UTC
+// calendar dates so timezone weirdness can't make tomorrow look like it's already past
 export function isPastDate(dateStr) {
   const utcTodayStr = new Date().toISOString().slice(0, 10);
   return dateStr < utcTodayStr;
@@ -86,12 +82,12 @@ export function isPastDateTime(isoString, nowMs = Date.now()) {
   return new Date(isoString).getTime() <= nowMs;
 }
 
-/** True when this grid cell's start time has passed (any day, not only UTC today). */
+// true if this grid cell is already in the past (works for any day, not just today)
 export function isSlotInPast(dateStr, hour, nowMs = Date.now()) {
   return isPastDateTime(slotToUTC(dateStr, hour).startTime, nowMs);
 }
 
-/** Get start of week (Monday) for a date, in UTC date string YYYY-MM-DD */
+// monday of the week containing this date, as a UTC YYYY-MM-DD string
 export function getWeekStartStr(date) {
   const d = new Date(date);
   const day = d.getUTCDay();
@@ -101,7 +97,7 @@ export function getWeekStartStr(date) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Build UTC ISO strings for a slot on a given date (YYYY-MM-DD) and hour (0-23) */
+// gives back start/end ISO strings for one hour slot on a given date
 export function slotToUTC(dateStr, hour) {
   const start = new Date(dateStr + "T00:00:00.000Z");
   start.setUTCHours(hour, 0, 0, 0);

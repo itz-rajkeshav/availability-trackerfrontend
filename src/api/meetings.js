@@ -1,10 +1,11 @@
 import { get, del } from "./client.js";
 
-export async function listMeetings(params = {}) {
-  const q = new URLSearchParams(params).toString();
-  return get(`/api/meetings${q ? `?${q}` : ""}`);
+// server scopes this by role - users/mentors get their own calls only, admin sees all
+export async function listMeetings() {
+  return get("/api/meetings");
 }
 
-export async function deleteMeeting(meetingId) {
-  return del(`/api/meetings/${meetingId}`);
+// admin only, reopens the linked request
+export async function deleteMeeting(id) {
+  return del(`/api/meetings/${id}`);
 }

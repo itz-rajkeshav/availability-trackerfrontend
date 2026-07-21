@@ -1,72 +1,65 @@
+import { ROLE_LOGIN_PATH, ROLE, homePathFor } from "../constants/roles.js";
+
+// empty string in dev, goes through the vite proxy on the same origin
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-function getToken() {
-  return sessionStorage.getItem("token") || localStorage.getItem("token");
+const STORAGE_KEYS = ["token", "userRole", "userId", "userEmail"];
+
+export function getToken() {
+  return localStorage.getItem("token");
 }
 
-function clearAuthAndRedirectToWelcome(expired = false) {
-  for (const key of ["token", "userRole", "userId", "userEmail", "role", "user"]) {
-    sessionStorage.removeItem(key);
-    localStorage.removeItem(key);
-  }
-  const q = expired ? "?expired=1" : "";
-  window.location.href = `/welcome${q}`;
+export function getStoredRole() {
+  return localStorage.getItem("userRole");
 }
 
-function redirectToRoleDashboardOrWelcome() {
-  const role = sessionStorage.getItem("userRole") || localStorage.getItem("userRole");
-  const path =
-    role === "ADMIN" ? "/admin" : role === "MENTOR" ? "/mentor" : "/availability";
-  window.location.href = path;
+export function clearAuthStorage() {
+  for (const key of STORAGE_KEYS) localStorage.removeItem(key);
+}
+
+function redirectToLogin(expired = false) {
+  const role = getStoredRole();
+  const path = ROLE_LOGIN_PATH[role] ?? ROLE_LOGIN_PATH[ROLE.USER];
+  clearAuthStorage();
+  window.location.href = expired ? `${path}?expired=1` : path;
 }
 
 export async function api(method, path, body, options = {}) {
+  const { skipAuthRedirect, headers: extraHeaders, ...fetchOptions } = options;
+
   const url = path.startsWith("http") ? path : `${API_URL}${path}`;
-  const headers = {
-    "Content-Type": "application/json",
-    "Cache-Control": "no-cache, no-store, must-revalidate", // ← add this
-    "Pragma": "no-cache",
-    ...options.headers,
-  };
+  const headers = { "Content-Type": "application/json", ...extraHeaders };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(url, {
+    // spread fetchOptions first so method/headers/body below can't get clobbered by it
+    ...fetchOptions,
     method,
     headers,
     credentials: "include",
-       cache: "no-store",
     ...(body != null && { body: JSON.stringify(body) }),
-    ...options,
   });
 
   const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
     if (res.status === 401) {
-      console.error("[client] 401 on:", path, "skipAuthRedirect:", options.skipAuthRedirect);
-      if (!options.skipAuthRedirect) {
-        clearAuthAndRedirectToWelcome(true);
-      }
-      const err = new Error("Session expired");
-      err.status = 401;
-      throw err;
+      if (!skipAuthRedirect) redirectToLogin(true);
+      throw Object.assign(new Error(data.error || "Session expired"), { status: 401, data });
     }
-    if (res.status === 403) {
-      redirectToRoleDashboardOrWelcome();
-      const err = new Error("Redirecting");
-      err.status = 403;
-      err.data = data;
-      throw err;
+    if (res.status === 403 && !skipAuthRedirect) {
+      // wrong role for this route, bounce them to their own home instead of a dead end
+      const role = getStoredRole();
+      if (role) window.location.href = homePathFor(role);
     }
-    const err = new Error(data.error || res.statusText);
-    err.status = res.status;
-    err.data = data;
-    throw err;
+    throw Object.assign(new Error(data.error || res.statusText), { status: res.status, data });
   }
+
   return data;
 }
 
-export const get = (path) => api("GET", path);
-export const post = (path, body) => api("POST", path, body);
-export const put = (path, body) => api("PUT", path, body);
-export const del = (path) => api("DELETE", path);
+export const get = (path, options) => api("GET", path, null, options);
+export const post = (path, body, options) => api("POST", path, body, options);
+export const put = (path, body, options) => api("PUT", path, body, options);
+export const del = (path, options) => api("DELETE", path, null, options);
